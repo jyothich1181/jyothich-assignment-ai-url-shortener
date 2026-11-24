@@ -1,75 +1,81 @@
-### Analysis and Engineering Assumptions
+### Analysis & Assumptions
 
-**Ambiguities:**
-*   **Validation scope:** Does "input URL validation" mean basic format checking (URL structure) or reachability checks?
-*   **Constraint enforcement:** Does "duplicate long URLs" imply a unique constraint at the database level?
-*   **Redirection behavior:** Should the system treat all identical URLs as the exact same resource with shared stats, or are they tracked independently?
-
-**Engineering Assumptions:**
-1.  **Validation:** I will use Jakarta Validation (`@URL`) for format validation to ensure standard URI compliance.
-2.  **Deduplication:** I will add a `UNIQUE` constraint on the `longUrl` field in the `UrlMapping` entity and use a `findOptionalByLongUrl` lookup in the service layer to prevent creation of redundant database rows.
-3.  **Performance:** I will index the `longUrl` column to ensure lookup speed remains O(log N) as the dataset grows.
-4.  **README:** I will create a `README.md` that covers architecture, API endpoints, and setup instructions.
+1.  **Ambiguities:** None significant. The workspace contains a well-defined structure for a URL shortener.
+2.  **Engineering Assumptions:**
+    *   The project uses H2 (in-memory) or a standard SQL database based on Spring Data JPA.
+    *   `Base62Encoder` is used for generating short identifiers.
+    *   "Deduplication" refers to returning the existing short URL if the original long URL has already been shortened.
+    *   Input validation is handled via standard Bean Validation (e.g., `@Valid` on controllers).
 
 ---
 
-### Implementation Plan (PLAN.md)
+### Implementation Plan
 
-# Implementation Plan: Deduplication and Validation
-
-## 1. Entity & Repository Updates
-- [ ] Add `@Column(unique = true)` to `longUrl` in `UrlMapping.java`.
-- [ ] Add `Optional<UrlMapping> findByLongUrl(String longUrl)` to `UrlRepository.java`.
-
-## 2. Service Layer Refactoring
-- [ ] Update `UrlService.shortenUrl` to check for existence of `longUrl` before generating a new code.
-- [ ] Throw `jakarta.validation.ConstraintViolationException` or handle via `@Valid` in Controller.
-
-## 3. Controller Layer
-- [ ] Add `@Valid` to the `UrlRequest` parameter in `UrlController.shortenUrl`.
-- [ ] Add `@URL` annotation to the `longUrl` field in `UrlRequest.java`.
-
-## 4. Testing
-- [ ] Add unit test in `UrlServiceTest` to verify that shortening the same URL twice returns the same code.
-- [ ] Add `UrlControllerTest` (MockMvc) to verify `400 Bad Request` for invalid URL formats.
-
-## 5. Documentation
-- [ ] Create `README.md` with:
-    - Project Overview.
-    - Architecture details.
-    - API usage.
-    - How to run tests.
+1.  **Exploration Phase:**
+    *   `list_files` to confirm current directory structure.
+    *   `read_file` on `pom.xml`, `UrlController.java`, `UrlMapping.java`, and `UrlService.java` to extract exact API paths, DTO structures, and business logic.
+2.  **Documentation Phase:**
+    *   Synthesize the findings into a professional `README.md`.
+    *   Include Prerequisites (Java 21, Maven 3.x).
+    *   Detail API Endpoints:
+        *   `POST /api/shorten`
+        *   `GET /{shortId}`
+        *   `GET /api/stats/{shortId}`
+    *   Outline Testing instructions.
+3.  **Finalization:**
+    *   Use `write_file` to create/overwrite `README.md`.
 
 ---
 
-### Step-by-Step Execution
+### Proposed README.md Content (Draft)
 
-#### Step 1: Updating DTO and Entity
-*   `src/main/java/com/example/shortener/dto/UrlRequest.java`: Add `@URL` and `@NotBlank`.
-*   `src/main/java/com/example/shortener/entity/UrlMapping.java`: Add unique constraint.
+```markdown
+# URL Shortener Service
 
-#### Step 2: Repository Update
-*   Ensure `UrlRepository` has the lookup method.
+A high-performance URL shortening service built with Java 21 and Spring Boot.
 
-#### Step 3: Service Logic
-```java
-public String shortenUrl(String longUrl) {
-    return repository.findByLongUrl(longUrl)
-        .map(UrlMapping::getShortCode)
-        .orElseGet(() -> {
-            String code = encoder.encode(System.currentTimeMillis());
-            // save...
-            return code;
-        });
-}
+## Prerequisites
+- JDK 21
+- Maven 3.8+
+
+## Architecture
+- **Entity**: `UrlMapping` (longUrl, shortId, visitCount)
+- **Service**: Business logic for Base62 encoding and deduplication.
+- **Controller**: REST endpoints for interaction.
+- **Repository**: Spring Data JPA for persistence.
+
+## API Endpoints
+
+### 1. Shorten URL
+`POST /api/shorten`
+- **Request**: `{"originalUrl": "https://example.com"}`
+- **Response**: `201 Created` - `{"shortUrl": "http://localhost:8080/aBc123"}`
+
+### 2. Redirect
+`GET /{shortId}`
+- **Response**: `302 Found` (Redirects to original URL)
+
+### 3. Analytics
+`GET /api/stats/{shortId}`
+- **Response**: `200 OK` - `{"originalUrl": "...", "visitCount": 5}`
+
+## Running the Application
+```bash
+mvn spring-boot:run
 ```
 
-#### Step 4: Testing
-*   Run `mvn test` to verify no regressions.
-
-#### Step 5: README.md Creation
-*   Draft the documentation based on the Spring Boot implementation details.
+## Running Tests
+```bash
+mvn test
+```
+```
 
 ---
 
-**Would you like me to proceed with applying these changes to the codebase?**
+### Execution Steps
+
+1.  **Execute** `list_files` to verify current state.
+2.  **Execute** `read_file` on key components to confirm DTO/Endpoint details.
+3.  **Execute** `write_file` to save `README.md`.
+
+*Proceeding with file exploration.*
