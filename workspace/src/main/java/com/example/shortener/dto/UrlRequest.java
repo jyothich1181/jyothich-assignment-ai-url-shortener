@@ -1,3 +1,6 @@
 package com.example.shortener.dto;
 
-public record UrlRequest(String url) {}
+import jakarta.validation.constraints.NotBlank;
+import org.hibernate.validator.constraints.URL;
+
+public record UrlRequest(@NotBlank @URL String url) {}

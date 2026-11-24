@@ -1,56 +1,75 @@
-To implement click analytics for the URL shortener, I have analyzed the requirements and established the following engineering plan.
+### Analysis and Engineering Assumptions
 
-### 1. Ambiguities & Assumptions
-*   **Ambiguity:** Should I track individual access events (audit log) or just aggregate values? 
-    *   **Assumption:** Given the requirement for "total clicks and last accessed," I will track aggregate counters and a timestamp on the `UrlMapping` entity to avoid massive table growth.
-*   **Ambiguity:** Performance impact of incrementing on every redirect.
-    *   **Assumption:** I will update the entity directly during the redirect flow. For high-scale production, this would eventually require an asynchronous approach (e.g., Kafka or Redis), but for this task, I will stick to synchronous persistence to ensure data consistency.
+**Ambiguities:**
+*   **Validation scope:** Does "input URL validation" mean basic format checking (URL structure) or reachability checks?
+*   **Constraint enforcement:** Does "duplicate long URLs" imply a unique constraint at the database level?
+*   **Redirection behavior:** Should the system treat all identical URLs as the exact same resource with shared stats, or are they tracked independently?
 
-### 2. Implementation Plan
-
-#### Step 1: Update Domain Model
-*   Modify `UrlMapping.java` to add `long clickCount` and `LocalDateTime lastAccessed`.
-*   Add a migration path or update the existing entity to include these fields (JPA will auto-update if `ddl-auto` is set, otherwise note the need for schema change).
-
-#### Step 2: Repository Update
-*   Ensure `UrlRepository` supports custom finders if needed (not strictly necessary as we already have `findByShortCode`).
-
-#### Step 3: Service Layer Enhancement
-*   Update `UrlService.shortenUrl` to initialize `clickCount` to 0.
-*   Implement `recordClick(String shortCode)` method to increment the counter and update the timestamp.
-*   Implement `getStats(String shortCode)` method to fetch the aggregate data.
-
-#### Step 4: Controller Update
-*   Update `UrlController` to call `recordClick` inside the redirection method.
-*   Create a new `GET /api/stats/{shortCode}` endpoint to return the analytics.
-
-#### Step 5: Data Transfer Objects (DTOs)
-*   Create `UrlStatsResponse.java` to encapsulate `shortCode`, `originalUrl`, `clickCount`, and `lastAccessed`.
-
-#### Step 6: Testing
-*   Write unit tests for `UrlService` to verify the increment logic.
-*   Write integration tests using `MockMvc` to verify the redirect triggers the increment and the stats endpoint returns accurate data.
+**Engineering Assumptions:**
+1.  **Validation:** I will use Jakarta Validation (`@URL`) for format validation to ensure standard URI compliance.
+2.  **Deduplication:** I will add a `UNIQUE` constraint on the `longUrl` field in the `UrlMapping` entity and use a `findOptionalByLongUrl` lookup in the service layer to prevent creation of redundant database rows.
+3.  **Performance:** I will index the `longUrl` column to ensure lookup speed remains O(log N) as the dataset grows.
+4.  **README:** I will create a `README.md` that covers architecture, API endpoints, and setup instructions.
 
 ---
 
-### 3. Detailed Tasks (PLAN.md)
+### Implementation Plan (PLAN.md)
 
-```markdown
-# Analytics Implementation Plan
+# Implementation Plan: Deduplication and Validation
 
-- [ ] **Step 1: Entity Update**
-    - Add `private long clickCount;` and `private LocalDateTime lastAccessed;` to `UrlMapping`.
-- [ ] **Step 2: DTO Creation**
-    - Create `UrlStatsResponse` containing fields for stats reporting.
-- [ ] **Step 3: Service Logic**
-    - Update `UrlService` to handle `recordClick` (atomic increment logic).
-    - Add `getStats` method to retrieve analytics.
-- [ ] **Step 4: Controller Endpoints**
-    - Modify the redirect endpoint in `UrlController` to trigger `recordClick`.
-    - Expose `GET /api/stats/{shortCode}`.
-- [ ] **Step 5: Testing**
-    - Update `UrlServiceTest` to cover increment logic.
-    - Create `UrlControllerIntegrationTest` to verify the full flow (Redirect -> Stats update).
+## 1. Entity & Repository Updates
+- [ ] Add `@Column(unique = true)` to `longUrl` in `UrlMapping.java`.
+- [ ] Add `Optional<UrlMapping> findByLongUrl(String longUrl)` to `UrlRepository.java`.
+
+## 2. Service Layer Refactoring
+- [ ] Update `UrlService.shortenUrl` to check for existence of `longUrl` before generating a new code.
+- [ ] Throw `jakarta.validation.ConstraintViolationException` or handle via `@Valid` in Controller.
+
+## 3. Controller Layer
+- [ ] Add `@Valid` to the `UrlRequest` parameter in `UrlController.shortenUrl`.
+- [ ] Add `@URL` annotation to the `longUrl` field in `UrlRequest.java`.
+
+## 4. Testing
+- [ ] Add unit test in `UrlServiceTest` to verify that shortening the same URL twice returns the same code.
+- [ ] Add `UrlControllerTest` (MockMvc) to verify `400 Bad Request` for invalid URL formats.
+
+## 5. Documentation
+- [ ] Create `README.md` with:
+    - Project Overview.
+    - Architecture details.
+    - API usage.
+    - How to run tests.
+
+---
+
+### Step-by-Step Execution
+
+#### Step 1: Updating DTO and Entity
+*   `src/main/java/com/example/shortener/dto/UrlRequest.java`: Add `@URL` and `@NotBlank`.
+*   `src/main/java/com/example/shortener/entity/UrlMapping.java`: Add unique constraint.
+
+#### Step 2: Repository Update
+*   Ensure `UrlRepository` has the lookup method.
+
+#### Step 3: Service Logic
+```java
+public String shortenUrl(String longUrl) {
+    return repository.findByLongUrl(longUrl)
+        .map(UrlMapping::getShortCode)
+        .orElseGet(() -> {
+            String code = encoder.encode(System.currentTimeMillis());
+            // save...
+            return code;
+        });
+}
 ```
 
-I will now proceed with these changes. I'll start by reading the current files to ensure I have the full context before modifying.
+#### Step 4: Testing
+*   Run `mvn test` to verify no regressions.
+
+#### Step 5: README.md Creation
+*   Draft the documentation based on the Spring Boot implementation details.
+
+---
+
+**Would you like me to proceed with applying these changes to the codebase?**
