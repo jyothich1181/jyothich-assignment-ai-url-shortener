@@ -2,6 +2,7 @@ package com.example.shortener.controller;
 
 import com.example.shortener.dto.UrlRequest;
 import com.example.shortener.dto.UrlResponse;
+import com.example.shortener.dto.UrlStatsResponse;
 import com.example.shortener.service.UrlService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,5 +26,12 @@ public class UrlController {
         String originalUrl = urlService.getOriginalUrl(shortKey)
                 .orElseThrow(() -> new RuntimeException("URL not found"));
         response.sendRedirect(originalUrl);
+    }
+
+    @GetMapping("/api/stats/{shortKey}")
+    public ResponseEntity<UrlStatsResponse> getStats(@PathVariable String shortKey) {
+        return urlService.getStats(shortKey)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

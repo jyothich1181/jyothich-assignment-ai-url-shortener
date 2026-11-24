@@ -23,6 +23,10 @@ public class UrlMapping {
 
     private LocalDateTime createdAt;
 
+    private long clickCount = 0;
+
+    private LocalDateTime lastAccessed;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

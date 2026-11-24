@@ -1,7 +1,7 @@
 package com.example.shortener.service;
 
-import com.example.shortener.dto.UrlRequest;
 import com.example.shortener.dto.UrlResponse;
+import com.example.shortener.dto.UrlStatsResponse;
 import com.example.shortener.entity.UrlMapping;
 import com.example.shortener.repository.UrlRepository;
 import com.example.shortener.util.Base62Encoder;
@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -25,13 +26,32 @@ public class UrlService {
                     UrlMapping mapping = UrlMapping.builder()
                             .originalUrl(originalUrl)
                             .shortKey(shortKey)
+                            .clickCount(0)
                             .build();
                     urlRepository.save(mapping);
                     return new UrlResponse(shortKey, originalUrl);
                 });
     }
 
+    @Transactional
     public Optional<String> getOriginalUrl(String shortKey) {
-        return urlRepository.findByShortKey(shortKey).map(UrlMapping::getOriginalUrl);
+        return urlRepository.findByShortKey(shortKey).map(mapping -> {
+            mapping.setClickCount(mapping.getClickCount() + 1);
+            mapping.setLastAccessed(LocalDateTime.now());
+            urlRepository.save(mapping);
+            return mapping.getOriginalUrl();
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UrlStatsResponse> getStats(String shortKey) {
+        return urlRepository.findByShortKey(shortKey).map(mapping -> 
+            UrlStatsResponse.builder()
+                    .shortKey(mapping.getShortKey())
+                    .originalUrl(mapping.getOriginalUrl())
+                    .clickCount(mapping.getClickCount())
+                    .lastAccessed(mapping.getLastAccessed())
+                    .build()
+        );
     }
 }
